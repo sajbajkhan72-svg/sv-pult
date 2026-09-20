@@ -38,10 +38,10 @@ h1 .n{color:var(--red)}
 .tabs{position:sticky;top:0;z-index:5;background:var(--paper);padding:8px 0 14px;margin:0 -2px}
 .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--line);padding:4px;border-radius:14px}
 .seg button{border:0;background:transparent;padding:11px 2px;border-radius:11px;
-  font-weight:600;font-size:14.5px;color:var(--muted);cursor:pointer;position:relative}
+  font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;position:relative;white-space:nowrap;letter-spacing:-.01em}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.badge{display:inline-block;min-width:19px;height:19px;padding:0 5px;margin-left:4px;border-radius:10px;
-  background:var(--red);color:#fff;font-size:12px;line-height:19px;vertical-align:1px}
+.badge{display:inline-block;min-width:17px;height:17px;padding:0 4px;margin-left:3px;border-radius:9px;
+  background:var(--red);color:#fff;font-size:11px;line-height:17px;vertical-align:1px}
 
 /* день в недельном виде */
 .day{margin:22px 2px 10px;font-size:13px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
@@ -112,7 +112,7 @@ footer b{color:var(--ink);font-weight:600}
     <button data-v="today" class="on">Сегодня</button>
     <button data-v="tomorrow">Завтра</button>
     <button data-v="week">Неделя</button>
-    <button data-v="wait">Ждут<span class="badge" id="badge" hidden></span></button>
+    <button data-v="wait">Отметить<span class="badge" id="badge" hidden></span></button>
   </div></div>
 
   <div id="list"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
@@ -126,7 +126,8 @@ footer b{color:var(--ink);font-weight:600}
 const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.platform !== 'unknown' ? Telegram.WebApp : null;
 const DEMO = /[?&]demo/.test(location.search);
 /* Отметки уходят в бот через sendData — это работает, только если пульт открыт кнопкой под строкой ввода. */
-const RELAY = (location.hash.match(/[#&]r=([A-Za-z0-9_-]+)/)||[])[1] || '';
+const P = new URLSearchParams(location.search);
+const RELAY = P.get('r') || (location.hash.match(/[#&]r=([A-Za-z0-9_-]+)/)||[])[1] || '';
 /* Отметки: из кнопки меню — через канал ntfy (бот проверяет подпись Telegram), из кнопки клавиатуры — sendData. */
 const CAN_SEND = !!(tg && tg.initData && (RELAY || !(tg.initDataUnsafe && tg.initDataUnsafe.query_id)));
 const marks = new Map();   // id -> итог, ещё не отправленные
@@ -134,7 +135,7 @@ const $ = id => document.getElementById(id);
 
 /* тема — как в Telegram */
 function applyTheme(){
-  const dark = tg ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = false;   // канон СВ-Транс — всегда светлый, одинаково на телефоне и компьютере
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   if (tg) { const bg = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); tg.setBottomBarColor && tg.setBottomBarColor(bg); } catch(e){} }
@@ -173,7 +174,8 @@ const waiting = () => data.filter(m => !closed(m) && isPast(m));
 
 /* ── данные: приходят внутри ссылки кнопки (#d=...) ── */
 function unpack(){
-  const m = location.hash.match(/[#&]d=([A-Za-z0-9_-]+)/);
+  const q = P.get('d');
+  const m = q ? [0, q] : location.hash.match(/[#&]d=([A-Za-z0-9_-]+)/);
   if (!m) return null;
   let b = m[1].replace(/-/g,'+').replace(/_/g,'/'); while (b.length % 4) b += '=';
   const bytes = Uint8Array.from(atob(b), c => c.charCodeAt(0));
@@ -206,7 +208,7 @@ function head(items){
   const n = items.length, open = items.filter(m=>!closed(m)).length;
   let k, h, s;
   if (view==='wait'){
-    k = 'Ждут вашей отметки';
+    k = 'Прошли — отметьте, как было';
     h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Всё отмечено';
     s = n ? 'Отметьте и нажмите «Сохранить» внизу — людям я напишу сам' : 'Спасибо! Писать людям не нужно.';
   } else if (view==='week'){
@@ -221,7 +223,7 @@ function head(items){
     if (!n) s = 'Встреч не назначено';
     else if (view==='tomorrow') s = 'Первый — ' + items[0].имя + ' в ' + items[0].время;
     else { const nx = items.find(m => !closed(m) && !isPast(m));
-      s = nx ? 'Следующий — ' + nx.имя + ' в ' + nx.время : open ? 'Ждут отметки: ' + open : 'Все отмечены — спасибо'; }
+      s = nx ? 'Следующий — ' + nx.имя + ' в ' + nx.время : open ? 'Не отмечено: ' + open : 'Все отмечены — спасибо'; }
   }
   $('kick').textContent = k; $('title').innerHTML = h; $('sub').textContent = s;
 }
