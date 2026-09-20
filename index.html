@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Пульт собеседований</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="telegram-web-app.js"></script>
+<script>window.onerror=function(m){var e=document.getElementById("err");if(e){e.hidden=false;e.textContent="Ошибка: "+m}};</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -120,6 +121,7 @@ footer b{color:var(--ink);font-weight:600}
   <footer><b id="addr">Тверь, Симеоновская улица, 72</b><br><span id="stamp"></span></footer>
 </div>
 <div class="toast" id="toast"></div>
+<div id="err" hidden style="position:fixed;top:8px;left:8px;right:8px;background:#fdeeee;color:#d92b2b;padding:10px;border-radius:10px;font-size:13px;z-index:99"></div>
 <button class="savebar" id="savebar" hidden></button>
 
 <script>
@@ -127,6 +129,7 @@ const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.platform !== 'u
 const DEMO = /[?&]demo/.test(location.search);
 /* Отметки уходят в бот через sendData — это работает, только если пульт открыт кнопкой под строкой ввода. */
 const P = new URLSearchParams(location.search);
+const BOT = P.get('b') || '';
 const RELAY = P.get('r') || (location.hash.match(/[#&]r=([A-Za-z0-9_-]+)/)||[])[1] || '';
 /* Отметки: из кнопки меню — через канал ntfy (бот проверяет подпись Telegram), из кнопки клавиатуры — sendData. */
 const CAN_SEND = !!(tg && tg.initData && (RELAY || !(tg.initDataUnsafe && tg.initDataUnsafe.query_id)));
@@ -186,7 +189,7 @@ function load(){
   let j = null;
   try { j = unpack(); } catch(e) {}
   if (!j) return fail('Откройте пульт из бота', 'Кнопка «📋 Пульт» — под строкой ввода в чате с ботом.');
-  data = j.m.map(r => ({id:r[0], дата:r[1], время:r[2], имя:r[3], роль:r[4], аккаунт:r[5], результат:r[6], статус:r[7]||'ожидается'}));
+  data = j.m.map(r => ({id:r[0], дата:r[1], время:r[2], имя:r[3], роль:r[4], аккаунт:r[5], результат:r[6], статус:r[7]||'ожидается', c:r[8]||''}));
   now = new Date(j.t);
   $('stamp').textContent = 'список на ' + hm(now) + (CAN_SEND ? '' : ' · только просмотр');
   draw();
@@ -289,14 +292,25 @@ async function send(){
   if (!RELAY){ hap('ok'); tg.sendData(payload); return; }
   sending = true;
   try { tg.MainButton.showProgress(); } catch(e){}
+  let ok = false;
   try{
-    const r = await fetch('https://ntfy.sh/' + RELAY, {method:'POST',
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch('https://ntfy.sh/' + RELAY, {method:'POST', signal: ctl.signal,
       body: JSON.stringify({marks:[...marks.entries()], initData: tg.initData})});
-    if (!r.ok) throw new Error(r.status);
+    clearTimeout(tm); ok = r.ok;
+  }catch(e){ ok = false; }
+  if (!ok && BOT){
+    /* запасной путь без сторонних сервисов: ссылка /start с кодами отметок прямо в чат бота */
+    const L = {'пришёл_берём':'b','пришёл_не_подошёл':'n','не_пришёл':'x'};
+    const sp = 'm' + [...marks.entries()].slice(0,10).map(([id,res]) => {
+      const m = data.find(x => x.id===id); return (m && m.c ? m.c : '') + (L[res] || 'u'); }).filter(s => s.length===6).join('');
+    try { tg.openTelegramLink('https://t.me/' + BOT + '?start=' + sp); ok = true; } catch(e){}
+  }
+  if (ok){
     for (const id of marks.keys()){ const m = data.find(x => x.id===id); if (m) m.orig = m.результат; }
     marks.clear(); draw(); hap('ok'); toast('Сохранено. Бот подтвердит в чате');
-  }catch(e){ hap('err'); toast('Не сохранилось — нет связи. Попробуйте ещё раз'); }
-  finally { sending = false; try { tg.MainButton.hideProgress(); } catch(e){} mainBtn(); }
+  } else { hap('err'); toast('Не сохранилось — нет связи. Попробуйте ещё раз'); }
+  sending = false; try { tg.MainButton.hideProgress(); } catch(e){} mainBtn();
 }
 
 function setView(v){
