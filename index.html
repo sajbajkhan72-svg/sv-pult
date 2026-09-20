@@ -126,7 +126,9 @@ footer b{color:var(--ink);font-weight:600}
 const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.platform !== 'unknown' ? Telegram.WebApp : null;
 const DEMO = /[?&]demo/.test(location.search);
 /* Отметки уходят в бот через sendData — это работает, только если пульт открыт кнопкой под строкой ввода. */
-const CAN_SEND = !!(tg && tg.initData && !(tg.initDataUnsafe && tg.initDataUnsafe.query_id));
+const RELAY = (location.hash.match(/[#&]r=([A-Za-z0-9_-]+)/)||[])[1] || '';
+/* Отметки: из кнопки меню — через канал ntfy (бот проверяет подпись Telegram), из кнопки клавиатуры — sendData. */
+const CAN_SEND = !!(tg && tg.initData && (RELAY || !(tg.initDataUnsafe && tg.initDataUnsafe.query_id)));
 const marks = new Map();   // id -> итог, ещё не отправленные
 const $ = id => document.getElementById(id);
 
@@ -277,11 +279,22 @@ function mainBtn(){
   if (n) tg.MainButton.setParams({text:'Сохранить отметки: '+n, is_visible:true, color:'#d92b2b', text_color:'#ffffff'});
   else tg.MainButton.hide();
 }
-function send(){
-  if (!marks.size) return;
-  if (!CAN_SEND){ hap('err'); toast('Откройте пульт кнопкой под строкой ввода — тогда отметки сохранятся'); return; }
-  hap('ok');
-  tg.sendData(JSON.stringify({marks:[...marks.entries()]}));   // Telegram закроет пульт сам
+let sending = false;
+async function send(){
+  if (!marks.size || sending) return;
+  if (!CAN_SEND){ hap('err'); toast('Откройте пульт из бота — кнопка «СВ-Транс» слева от строки ввода'); return; }
+  const payload = JSON.stringify({marks:[...marks.entries()]});
+  if (!RELAY){ hap('ok'); tg.sendData(payload); return; }
+  sending = true;
+  try { tg.MainButton.showProgress(); } catch(e){}
+  try{
+    const r = await fetch('https://ntfy.sh/' + RELAY, {method:'POST',
+      body: JSON.stringify({marks:[...marks.entries()], initData: tg.initData})});
+    if (!r.ok) throw new Error(r.status);
+    for (const id of marks.keys()){ const m = data.find(x => x.id===id); if (m) m.orig = m.результат; }
+    marks.clear(); draw(); hap('ok'); toast('Сохранено. Бот подтвердит в чате');
+  }catch(e){ hap('err'); toast('Не сохранилось — нет связи. Попробуйте ещё раз'); }
+  finally { sending = false; try { tg.MainButton.hideProgress(); } catch(e){} mainBtn(); }
 }
 
 function setView(v){
