@@ -137,14 +137,14 @@ const marks = new Map();   // id -> итог, ещё не отправленны
 const $ = id => document.getElementById(id);
 
 /* тема — как в Telegram */
-function applyTheme(){
+function pTheme(){
   const dark = false;   // канон СВ-Транс — всегда светлый, одинаково на телефоне и компьютере
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   if (tg) { const bg = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
     try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); tg.setBottomBarColor && tg.setBottomBarColor(bg); } catch(e){} }
 }
-if (tg) { tg.ready(); tg.expand(); tg.onEvent('themeChanged', applyTheme); }
-applyTheme();
+if (tg) { tg.ready(); tg.expand(); tg.onEvent('themeChanged', pTheme); }
+pTheme();
 
 const WD  = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
 const WDv = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
@@ -161,14 +161,14 @@ let view = 'today', data = [], now = new Date(), openId = null;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const addD = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
-const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const pDay = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 const hm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-function word(n, f){ const a=n%10,b=n%100; return a===1&&b!==11?f[0]:(a>=2&&a<=4&&(b<12||b>14))?f[1]:f[2]; }
+function pWord(n, f){ const a=n%10,b=n%100; return a===1&&b!==11?f[0]:(a>=2&&a<=4&&(b<12||b>14))?f[1]:f[2]; }
 const MEET = ['встреча','встречи','встреч'];
 
-function hap(t){ try{ const h = tg.HapticFeedback;
+function pHap(t){ try{ const h = tg.HapticFeedback;
   t==='ok' ? h.notificationOccurred('success') : t==='err' ? h.notificationOccurred('error') : h.selectionChanged(); }catch(e){} }
-function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._); t._=setTimeout(()=>t.classList.remove('on'),2600); }
+function pToast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._); t._=setTimeout(()=>t.classList.remove('on'),2600); }
 
 const TODAY = () => iso(now);
 const closed = m => !!(m.результат || CLOSED[m.статус]);
@@ -176,7 +176,7 @@ const isPast = m => m.дата < TODAY() || (m.дата === TODAY() && m.вре�
 const waiting = () => data.filter(m => !closed(m) && isPast(m));
 
 /* ── данные: приходят внутри ссылки кнопки (#d=...) ── */
-function unpack(){
+function pUnpack(){
   const q = P.get('d');
   const m = q ? [0, q] : location.hash.match(/[#&]d=([A-Za-z0-9_-]+)/);
   if (!m) return null;
@@ -184,22 +184,22 @@ function unpack(){
   const bytes = Uint8Array.from(atob(b), c => c.charCodeAt(0));
   return JSON.parse(new TextDecoder().decode(bytes));
 }
-function load(){
-  if (DEMO) { demo(); return draw(); }
+function pLoad(){
+  if (DEMO) { pDemo(); return pDraw(); }
   let j = null;
-  try { j = unpack(); } catch(e) {}
-  if (!j) return fail('Откройте пульт из бота', 'Кнопка «📋 Пульт» — под строкой ввода в чате с ботом.');
+  try { j = pUnpack(); } catch(e) {}
+  if (!j) return pFail('Откройте пульт из бота', 'Кнопка «📋 Пульт» — под строкой ввода в чате с ботом.');
   data = j.m.map(r => ({id:r[0], дата:r[1], время:r[2], имя:r[3], роль:r[4], аккаунт:r[5], результат:r[6], статус:r[7]||'ожидается', c:r[8]||''}));
-  now = new Date(j.t);
+  { const q = String(j.t).match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/); now = q ? new Date(+q[1], q[2]-1, +q[3], +q[4], +q[5]) : new Date(); }
   $('stamp').textContent = 'список на ' + hm(now) + (CAN_SEND ? '' : ' · только просмотр');
-  draw();
+  pDraw();
 }
-function fail(t, s){
+function pFail(t, s){
   $('kick').innerHTML='&nbsp;'; $('title').textContent=t; $('sub').textContent=s; $('list').innerHTML='';
 }
 
 /* ── отрисовка ── */
-function pick(){
+function pPick(){
   const t = TODAY(), tm = iso(addD(now,1)), w = iso(addD(now,7));
   if (view==='today')    return data.filter(m => m.дата===t);
   if (view==='tomorrow') return data.filter(m => m.дата===tm);
@@ -207,22 +207,22 @@ function pick(){
   return waiting();
 }
 
-function head(items){
+function pHead(items){
   const n = items.length, open = items.filter(m=>!closed(m)).length;
   let k, h, s;
   if (view==='wait'){
     k = 'Прошли — отметьте, как было';
-    h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Всё отмечено';
+    h = n ? `<span class="n">${n}</span> ${pWord(n,MEET)}` : 'Всё отмечено';
     s = n ? 'Отметьте и нажмите «Сохранить» внизу — людям я напишу сам' : 'Спасибо! Писать людям не нужно.';
   } else if (view==='week'){
     k = 'Ближайшие 7 дней';
-    h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Встреч нет';
+    h = n ? `<span class="n">${n}</span> ${pWord(n,MEET)}` : 'Встреч нет';
     const days = new Set(items.map(m=>m.дата)).size;
-    s = n ? `в ${days} ${word(days,['день','дня','дней'])}` : 'Новые появятся, как только люди запишутся';
+    s = n ? `в ${days} ${pWord(days,['день','дня','дней'])}` : 'Новые появятся, как только люди запишутся';
   } else {
     const d = view==='today' ? now : addD(now,1);
     k = (view==='today'?'Сегодня':'Завтра') + ', ' + WD[d.getDay()] + ', ' + d.getDate() + ' ' + MON[d.getMonth()];
-    h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Свободный день';
+    h = n ? `<span class="n">${n}</span> ${pWord(n,MEET)}` : 'Свободный день';
     if (!n) s = 'Встреч не назначено';
     else if (view==='tomorrow') s = 'Первый — ' + items[0].имя + ' в ' + items[0].время;
     else { const nx = items.find(m => !closed(m) && !isPast(m));
@@ -231,10 +231,10 @@ function head(items){
   $('kick').textContent = k; $('title').innerHTML = h; $('sub').textContent = s;
 }
 
-function card(m, nextId){
+function pCard(m, nextId){
   const r = m.результат && RES[m.результат];
   const acc = m.аккаунт && m.аккаунт !== 'ТК' ? ' · ' + esc(m.аккаунт).replace(/-/g,'\u2011') : '';
-  const dd = view==='wait' && m.дата !== TODAY() ? ' · ' + parse(m.дата).getDate() + ' ' + MON[parse(m.дата).getMonth()] : '';
+  const dd = view==='wait' && m.дата !== TODAY() ? ' · ' + pDay(m.дата).getDate() + ' ' + MON[pDay(m.дата).getMonth()] : '';
   let tag = '';
   if (r) tag = `<span class="tag ${r.k}">${r.ic} ${r.t}</span>`;
   else if (CLOSED[m.статус]) tag = `<span class="tag x">${CLOSED[m.статус]}</span>`;
@@ -253,9 +253,9 @@ function card(m, nextId){
     <div class="acts"><div>${body}</div></div></div>`;
 }
 
-function draw(){
-  const items = pick().sort((a,b) => (a.дата+a.время).localeCompare(b.дата+b.время));
-  head(items);
+function pDraw(){
+  const items = pPick().sort((a,b) => (a.дата+a.время).localeCompare(b.дата+b.время));
+  pHead(items);
   const w = waiting().length, b = $('badge'); b.hidden = !w; b.textContent = w;
   const nx = data.filter(m => m.дата===TODAY() && !closed(m) && !isPast(m)).sort((a,b)=>a.время.localeCompare(b.время))[0];
   const nextId = nx && nx.id;
@@ -265,31 +265,31 @@ function draw(){
   } else if (view==='week'){
     let out = '', last = '';
     for (const m of items){
-      if (m.дата !== last){ last = m.дата; const d = parse(m.дата);
+      if (m.дата !== last){ last = m.дата; const d = pDay(m.дата);
         const lbl = m.дата===TODAY() ? 'Сегодня' : m.дата===iso(addD(now,1)) ? 'Завтра' : WD[d.getDay()];
         out += `<div class="day">${lbl}, ${d.getDate()} ${MON[d.getMonth()]}</div>`; }
-      out += card(m, nextId);
+      out += pCard(m, nextId);
     }
     L.innerHTML = out;
-  } else L.innerHTML = items.map(m => card(m, nextId)).join('');
-  mainBtn();
+  } else L.innerHTML = items.map(m => pCard(m, nextId)).join('');
+  pMainBtn();
 }
 
 /* нижняя кнопка Telegram: «Сохранить отметки» */
 let mbBound = false;
-function mainBtn(){
+function pMainBtn(){
   const n = marks.size;
   if (!tg || !tg.MainButton) { $('savebar').hidden = !n; $('savebar').textContent = 'Сохранить отметки: ' + n; return; }
-  if (!mbBound){ tg.MainButton.onClick(send); mbBound = true; }
+  if (!mbBound){ tg.MainButton.onClick(pSend); mbBound = true; }
   if (n) tg.MainButton.setParams({text:'Сохранить отметки: '+n, is_visible:true, color:'#d92b2b', text_color:'#ffffff'});
   else tg.MainButton.hide();
 }
 let sending = false;
-async function send(){
+async function pSend(){
   if (!marks.size || sending) return;
-  if (!CAN_SEND){ hap('err'); toast('Откройте пульт из бота — кнопка «СВ-Транс» слева от строки ввода'); return; }
+  if (!CAN_SEND){ pHap('err'); pToast('Откройте пульт из бота — кнопка «СВ-Транс» слева от строки ввода'); return; }
   const payload = JSON.stringify({marks:[...marks.entries()]});
-  if (!RELAY){ hap('ok'); tg.sendData(payload); return; }
+  if (!RELAY){ pHap('ok'); tg.sendData(payload); return; }
   sending = true;
   try { tg.MainButton.showProgress(); } catch(e){}
   let ok = false;
@@ -308,40 +308,40 @@ async function send(){
   }
   if (ok){
     for (const id of marks.keys()){ const m = data.find(x => x.id===id); if (m) m.orig = m.результат; }
-    marks.clear(); draw(); hap('ok'); toast('Сохранено. Бот подтвердит в чате');
-  } else { hap('err'); toast('Не сохранилось — нет связи. Попробуйте ещё раз'); }
-  sending = false; try { tg.MainButton.hideProgress(); } catch(e){} mainBtn();
+    marks.clear(); pDraw(); pHap('ok'); pToast('Сохранено. Бот подтвердит в чате');
+  } else { pHap('err'); pToast('Не сохранилось — нет связи. Попробуйте ещё раз'); }
+  sending = false; try { tg.MainButton.hideProgress(); } catch(e){} pMainBtn();
 }
 
-function setView(v){
+function pSetView(v){
   view = v; openId = null;
   document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.v===v));
-  hap(); draw(); scrollTo({top:0, behavior:'smooth'});
+  pHap(); pDraw(); scrollTo({top:0, behavior:'smooth'});
 }
-$('seg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setView(b.dataset.v); });
+$('seg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pSetView(b.dataset.v); });
 
 $('list').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
   const id = c.dataset.id, act = e.target.closest('[data-r]'), undo = e.target.closest('[data-u]');
-  if (act) return save(id, act.dataset.r);
-  if (undo) return save(id, null);
+  if (act) return pSave(id, act.dataset.r);
+  if (undo) return pSave(id, null);
   if (e.target.closest('.row')){
-    openId = openId===id ? null : id; hap();
+    openId = openId===id ? null : id; pHap();
     document.querySelectorAll('.card').forEach(x => x.classList.toggle('open', x.dataset.id===openId));
   }
 });
 
-function save(id, result){
+function pSave(id, result){
   const m = data.find(x => x.id===id); if (!m) return;
   if (!('orig' in m)) m.orig = m.результат;
   m.результат = result; m.статус = result || 'ожидается'; openId = result ? null : id;
   if (result === m.orig) marks.delete(id); else marks.set(id, result);
-  draw();
-  if (result){ hap('ok'); toast(marks.size ? 'Отмечено. Нажмите «Сохранить» внизу' : RES[result].say); } else hap();
+  pDraw();
+  if (result){ pHap('ok'); pToast(marks.size ? 'Отмечено. Нажмите «Сохранить» внизу' : RES[result].say); } else pHap();
 }
 
 /* демо для проверки без Telegram: ?demo */
-function demo(){
+function pDemo(){
   now = new Date(); now.setHours(11,20,0,0);
   const t = iso(now), tm = iso(addD(now,1)), y = iso(addD(now,-1)), f = iso(addD(now,3));
   const M = (d,tt,n,r,a,res,st) => ({id:d+tt+n, дата:d, время:tt, имя:n, роль:r, аккаунт:a, результат:res||null, статус:st||res||'ожидается'});
@@ -359,10 +359,10 @@ function demo(){
   ];
   $('stamp').textContent = 'демо-данные';
 }
-document.getElementById('savebar').onclick = () => { toast('Демо: в Telegram отметки уйдут в бот'); marks.clear(); draw();
+document.getElementById('savebar').onclick = () => { pToast('Демо: в Telegram отметки уйдут в бот'); marks.clear(); pDraw();
 }
 
-load();
+pLoad();
 </script>
 </body>
 </html>
