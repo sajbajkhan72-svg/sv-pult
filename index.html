@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Пульт собеседований</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Канон СВ-Транс: бумага, чернила, тонкая линия, красный акцент. Крупно и спокойно. */
+:root{
+  --paper:#fafafa; --card:#fff; --ink:#0a0a0a; --muted:#6b6b6b; --faint:#9b9b9b;
+  --line:#e2e2e2; --red:#d92b2b; --red-soft:#fdeeee;
+  --green:#1f8f4e; --green-soft:#eaf6ef; --amber:#b86e00; --amber-soft:#fdf4e6;
+  --r:18px; --top:env(safe-area-inset-top);
+}
+:root[data-theme="dark"]{
+  --paper:#0f0f10; --card:#1a1a1c; --ink:#f4f4f5; --muted:#a0a0a6; --faint:#6e6e74;
+  --line:#2b2b2f; --red:#ff5a5a; --red-soft:#2a1717;
+  --green:#3ccf7e; --green-soft:#132519; --amber:#ffb340; --amber-soft:#2a2112;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--paper)}
+body{color:var(--ink);font:17px/1.45 "IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+button{font-family:inherit;color:inherit}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+
+header{padding:calc(22px + var(--top)) 2px 18px}
+.kick{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+h1{margin:6px 0 0;font-size:38px;line-height:1.05;font-weight:700;letter-spacing:-.025em}
+h1 .n{color:var(--red)}
+.sub{margin-top:8px;font-size:16px;color:var(--muted)}
+
+/* вкладки */
+.tabs{position:sticky;top:0;z-index:5;background:var(--paper);padding:8px 0 14px;margin:0 -2px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--line);padding:4px;border-radius:14px}
+.seg button{border:0;background:transparent;padding:11px 2px;border-radius:11px;
+  font-weight:600;font-size:14.5px;color:var(--muted);cursor:pointer;position:relative}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.badge{display:inline-block;min-width:19px;height:19px;padding:0 5px;margin-left:4px;border-radius:10px;
+  background:var(--red);color:#fff;font-size:12px;line-height:19px;vertical-align:1px}
+
+/* день в недельном виде */
+.day{margin:22px 2px 10px;font-size:13px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.day:first-child{margin-top:4px}
+
+/* карточка */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden;
+  transition:border-color .15s}
+.card.next{border-color:var(--ink)}
+.row{display:flex;align-items:center;gap:14px;padding:16px 16px 16px 18px;cursor:pointer;user-select:none}
+.tm{font-variant-numeric:tabular-nums;font-weight:700;font-size:22px;letter-spacing:-.02em;min-width:62px}
+.who{flex:1;min-width:0}
+.nm{font-weight:600;font-size:18px;line-height:1.25;overflow-wrap:anywhere}
+.mt{font-size:14px;color:var(--muted);margin-top:3px;white-space:nowrap}
+.tag{flex:0 0 auto;font-size:13px;font-weight:600;padding:6px 10px;border-radius:999px;white-space:nowrap}
+.tag.next{background:var(--ink);color:var(--paper)}
+.tag.wait{background:var(--red-soft);color:var(--red)}
+.tag.g{background:var(--green-soft);color:var(--green)}
+.tag.r{background:var(--red-soft);color:var(--red)}
+.tag.a{background:var(--amber-soft);color:var(--amber)}
+.tag.x{background:var(--line);color:var(--muted)}
+
+.acts{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s cubic-bezier(.2,.8,.3,1)}
+.card.open .acts{grid-template-rows:1fr}
+.acts>div{overflow:hidden}
+.acts .in{display:grid;gap:8px;padding:2px 12px 14px}
+.q{font-size:14px;color:var(--muted);padding:4px 6px 2px}
+.act{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line);background:var(--paper);
+  border-radius:14px;padding:17px 16px;font-weight:600;font-size:17px;text-align:left;cursor:pointer;
+  transition:transform .08s}
+.act:active{transform:scale(.985)}
+.act i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:14px;flex:0 0 auto}
+.act.g i{background:var(--green-soft);color:var(--green)}
+.act.r i{background:var(--red-soft);color:var(--red)}
+.act.a i{background:var(--amber-soft);color:var(--amber)}
+.undo{border:0;background:none;color:var(--muted);font-size:14px;padding:4px 6px 0;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;justify-self:start}
+
+/* состояния */
+.empty{text-align:center;padding:64px 24px 40px}
+.empty b{display:block;font-size:24px;letter-spacing:-.02em;margin-bottom:8px}
+.empty span{color:var(--muted);font-size:15px}
+.sk{height:78px;border-radius:var(--r);background:var(--card);border:1px solid var(--line);margin-bottom:10px;
+  animation:p 1.3s ease-in-out infinite}
+@keyframes p{50%{opacity:.5}}
+
+footer{text-align:center;color:var(--faint);font-size:13px;padding:26px 12px 0;line-height:1.7}
+footer b{color:var(--ink);font-weight:600}
+
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,160%);
+  background:var(--ink);color:var(--paper);padding:13px 20px;border-radius:14px;font-weight:600;font-size:15px;
+  transition:transform .26s cubic-bezier(.2,.9,.3,1),visibility .26s;z-index:50;max-width:88vw;text-align:center;visibility:hidden}
+.toast.on{transform:translate(-50%,0);visibility:visible}
+.savebar{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));border:0;border-radius:14px;
+  background:var(--red);color:#fff;font-weight:600;font-size:17px;padding:17px;z-index:40}
+.savebar[hidden]{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kick" id="kick">&nbsp;</div>
+    <h1 id="title">Загружаю…</h1>
+    <div class="sub" id="sub">&nbsp;</div>
+  </header>
+
+  <div class="tabs"><div class="seg" id="seg">
+    <button data-v="today" class="on">Сегодня</button>
+    <button data-v="tomorrow">Завтра</button>
+    <button data-v="week">Неделя</button>
+    <button data-v="wait">Ждут<span class="badge" id="badge" hidden></span></button>
+  </div></div>
+
+  <div id="list"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+
+  <footer><b id="addr">Тверь, Симеоновская улица, 72</b><br><span id="stamp"></span></footer>
+</div>
+<div class="toast" id="toast"></div>
+<button class="savebar" id="savebar" hidden></button>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp && Telegram.WebApp.platform !== 'unknown' ? Telegram.WebApp : null;
+const DEMO = /[?&]demo/.test(location.search);
+/* Отметки уходят в бот через sendData — это работает, только если пульт открыт кнопкой под строкой ввода. */
+const CAN_SEND = !!(tg && tg.initData && !(tg.initDataUnsafe && tg.initDataUnsafe.query_id));
+const marks = new Map();   // id -> итог, ещё не отправленные
+const $ = id => document.getElementById(id);
+
+/* тема — как в Telegram */
+function applyTheme(){
+  const dark = tg ? tg.colorScheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  if (tg) { const bg = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+    try { tg.setHeaderColor(bg); tg.setBackgroundColor(bg); tg.setBottomBarColor && tg.setBottomBarColor(bg); } catch(e){} }
+}
+if (tg) { tg.ready(); tg.expand(); tg.onEvent('themeChanged', applyTheme); }
+applyTheme();
+
+const WD  = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+const WDv = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+const MON = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const RES = {
+  'пришёл_берём':      {k:'g', ic:'✓', t:'Берём',       say:'Спрошу, когда сможет выйти'},
+  'пришёл_не_подошёл': {k:'r', ic:'✕', t:'Не подошёл',  say:'Отправлю вежливый отказ'},
+  'не_пришёл':         {k:'a', ic:'—', t:'Не пришёл',   say:'Предложу другой день'}
+};
+const CLOSED = {'перенесено':'Перенесено','отказ':'Отказался'};
+
+let view = 'today', data = [], now = new Date(), openId = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addD = (d,n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const hm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+function word(n, f){ const a=n%10,b=n%100; return a===1&&b!==11?f[0]:(a>=2&&a<=4&&(b<12||b>14))?f[1]:f[2]; }
+const MEET = ['встреча','встречи','встреч'];
+
+function hap(t){ try{ const h = tg.HapticFeedback;
+  t==='ok' ? h.notificationOccurred('success') : t==='err' ? h.notificationOccurred('error') : h.selectionChanged(); }catch(e){} }
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(t._); t._=setTimeout(()=>t.classList.remove('on'),2600); }
+
+const TODAY = () => iso(now);
+const closed = m => !!(m.результат || CLOSED[m.статус]);
+const isPast = m => m.дата < TODAY() || (m.дата === TODAY() && m.время <= hm(now));
+const waiting = () => data.filter(m => !closed(m) && isPast(m));
+
+/* ── данные: приходят внутри ссылки кнопки (#d=...) ── */
+function unpack(){
+  const m = location.hash.match(/[#&]d=([A-Za-z0-9_-]+)/);
+  if (!m) return null;
+  let b = m[1].replace(/-/g,'+').replace(/_/g,'/'); while (b.length % 4) b += '=';
+  const bytes = Uint8Array.from(atob(b), c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function load(){
+  if (DEMO) { demo(); return draw(); }
+  let j = null;
+  try { j = unpack(); } catch(e) {}
+  if (!j) return fail('Откройте пульт из бота', 'Кнопка «📋 Пульт» — под строкой ввода в чате с ботом.');
+  data = j.m.map(r => ({id:r[0], дата:r[1], время:r[2], имя:r[3], роль:r[4], аккаунт:r[5], результат:r[6], статус:r[7]||'ожидается'}));
+  now = new Date(j.t);
+  $('stamp').textContent = 'список на ' + hm(now) + (CAN_SEND ? '' : ' · только просмотр');
+  draw();
+}
+function fail(t, s){
+  $('kick').innerHTML='&nbsp;'; $('title').textContent=t; $('sub').textContent=s; $('list').innerHTML='';
+}
+
+/* ── отрисовка ── */
+function pick(){
+  const t = TODAY(), tm = iso(addD(now,1)), w = iso(addD(now,7));
+  if (view==='today')    return data.filter(m => m.дата===t);
+  if (view==='tomorrow') return data.filter(m => m.дата===tm);
+  if (view==='week')     return data.filter(m => m.дата>=t && m.дата<w);
+  return waiting();
+}
+
+function head(items){
+  const n = items.length, open = items.filter(m=>!closed(m)).length;
+  let k, h, s;
+  if (view==='wait'){
+    k = 'Ждут вашей отметки';
+    h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Всё отмечено';
+    s = n ? 'Отметьте и нажмите «Сохранить» внизу — людям я напишу сам' : 'Спасибо! Писать людям не нужно.';
+  } else if (view==='week'){
+    k = 'Ближайшие 7 дней';
+    h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Встреч нет';
+    const days = new Set(items.map(m=>m.дата)).size;
+    s = n ? `в ${days} ${word(days,['день','дня','дней'])}` : 'Новые появятся, как только люди запишутся';
+  } else {
+    const d = view==='today' ? now : addD(now,1);
+    k = (view==='today'?'Сегодня':'Завтра') + ', ' + WD[d.getDay()] + ', ' + d.getDate() + ' ' + MON[d.getMonth()];
+    h = n ? `<span class="n">${n}</span> ${word(n,MEET)}` : 'Свободный день';
+    if (!n) s = 'Встреч не назначено';
+    else if (view==='tomorrow') s = 'Первый — ' + items[0].имя + ' в ' + items[0].время;
+    else { const nx = items.find(m => !closed(m) && !isPast(m));
+      s = nx ? 'Следующий — ' + nx.имя + ' в ' + nx.время : open ? 'Ждут отметки: ' + open : 'Все отмечены — спасибо'; }
+  }
+  $('kick').textContent = k; $('title').innerHTML = h; $('sub').textContent = s;
+}
+
+function card(m, nextId){
+  const r = m.результат && RES[m.результат];
+  const acc = m.аккаунт && m.аккаунт !== 'ТК' ? ' · ' + esc(m.аккаунт).replace(/-/g,'\u2011') : '';
+  const dd = view==='wait' && m.дата !== TODAY() ? ' · ' + parse(m.дата).getDate() + ' ' + MON[parse(m.дата).getMonth()] : '';
+  let tag = '';
+  if (r) tag = `<span class="tag ${r.k}">${r.ic} ${r.t}</span>`;
+  else if (CLOSED[m.статус]) tag = `<span class="tag x">${CLOSED[m.статус]}</span>`;
+  else if (m.id === nextId) tag = '<span class="tag next">Следующий</span>';
+  else if (isPast(m)) tag = '<span class="tag wait">Отметить</span>';
+  const canAct = !CLOSED[m.статус];
+  const body = !canAct ? '' : r
+    ? `<div class="in"><button class="undo" data-u="${esc(m.id)}">Изменить отметку</button></div>`
+    : `<div class="in"><div class="q">Как прошла встреча?</div>
+        <button class="act g" data-r="пришёл_берём"><i>✓</i>Пришёл, берём</button>
+        <button class="act r" data-r="пришёл_не_подошёл"><i>✕</i>Пришёл, не подошёл</button>
+        <button class="act a" data-r="не_пришёл"><i>—</i>Не пришёл</button></div>`;
+  return `<div class="card ${m.id===nextId?'next':''} ${openId===m.id?'open':''}" data-id="${esc(m.id)}">
+    <div class="row"><div class="tm">${esc(m.время)}</div>
+      <div class="who"><div class="nm">${esc(m.имя)}</div><div class="mt">${esc(m.роль||'')}${acc}${dd}</div></div>${tag}</div>
+    <div class="acts"><div>${body}</div></div></div>`;
+}
+
+function draw(){
+  const items = pick().sort((a,b) => (a.дата+a.время).localeCompare(b.дата+b.время));
+  head(items);
+  const w = waiting().length, b = $('badge'); b.hidden = !w; b.textContent = w;
+  const nx = data.filter(m => m.дата===TODAY() && !closed(m) && !isPast(m)).sort((a,b)=>a.время.localeCompare(b.время))[0];
+  const nextId = nx && nx.id;
+  const L = $('list');
+  if (!items.length){
+    L.innerHTML = `<div class="empty"><b>${view==='wait'?'Готово':'Пусто'}</b><span>${view==='wait'?'Все прошедшие встречи отмечены.':'На эти дни встреч нет.'}</span></div>`;
+  } else if (view==='week'){
+    let out = '', last = '';
+    for (const m of items){
+      if (m.дата !== last){ last = m.дата; const d = parse(m.дата);
+        const lbl = m.дата===TODAY() ? 'Сегодня' : m.дата===iso(addD(now,1)) ? 'Завтра' : WD[d.getDay()];
+        out += `<div class="day">${lbl}, ${d.getDate()} ${MON[d.getMonth()]}</div>`; }
+      out += card(m, nextId);
+    }
+    L.innerHTML = out;
+  } else L.innerHTML = items.map(m => card(m, nextId)).join('');
+  mainBtn();
+}
+
+/* нижняя кнопка Telegram: «Сохранить отметки» */
+let mbBound = false;
+function mainBtn(){
+  const n = marks.size;
+  if (!tg || !tg.MainButton) { $('savebar').hidden = !n; $('savebar').textContent = 'Сохранить отметки: ' + n; return; }
+  if (!mbBound){ tg.MainButton.onClick(send); mbBound = true; }
+  if (n) tg.MainButton.setParams({text:'Сохранить отметки: '+n, is_visible:true, color:'#d92b2b', text_color:'#ffffff'});
+  else tg.MainButton.hide();
+}
+function send(){
+  if (!marks.size) return;
+  if (!CAN_SEND){ hap('err'); toast('Откройте пульт кнопкой под строкой ввода — тогда отметки сохранятся'); return; }
+  hap('ok');
+  tg.sendData(JSON.stringify({marks:[...marks.entries()]}));   // Telegram закроет пульт сам
+}
+
+function setView(v){
+  view = v; openId = null;
+  document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.v===v));
+  hap(); draw(); scrollTo({top:0, behavior:'smooth'});
+}
+$('seg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setView(b.dataset.v); });
+
+$('list').addEventListener('click', e => {
+  const c = e.target.closest('.card'); if (!c) return;
+  const id = c.dataset.id, act = e.target.closest('[data-r]'), undo = e.target.closest('[data-u]');
+  if (act) return save(id, act.dataset.r);
+  if (undo) return save(id, null);
+  if (e.target.closest('.row')){
+    openId = openId===id ? null : id; hap();
+    document.querySelectorAll('.card').forEach(x => x.classList.toggle('open', x.dataset.id===openId));
+  }
+});
+
+function save(id, result){
+  const m = data.find(x => x.id===id); if (!m) return;
+  if (!('orig' in m)) m.orig = m.результат;
+  m.результат = result; m.статус = result || 'ожидается'; openId = result ? null : id;
+  if (result === m.orig) marks.delete(id); else marks.set(id, result);
+  draw();
+  if (result){ hap('ok'); toast(marks.size ? 'Отмечено. Нажмите «Сохранить» внизу' : RES[result].say); } else hap();
+}
+
+/* демо для проверки без Telegram: ?demo */
+function demo(){
+  now = new Date(); now.setHours(11,20,0,0);
+  const t = iso(now), tm = iso(addD(now,1)), y = iso(addD(now,-1)), f = iso(addD(now,3));
+  const M = (d,tt,n,r,a,res,st) => ({id:d+tt+n, дата:d, время:tt, имя:n, роль:r, аккаунт:a, результат:res||null, статус:st||res||'ожидается'});
+  data = [
+    M(y,'14:00','Ольга Демо','логист','ТК'),
+    M(t,'08:30','Анна Пример','логист','ТК','пришёл_берём'),
+    M(t,'09:00','Павел Образцов','водитель','СВ-Транс','не_пришёл'),
+    M(t,'10:00','Иван Тестов','водитель','ТК'),
+    M(t,'12:00','Мария Проба','логист','ТК'),
+    M(t,'13:30','Олег Макетов','водитель','СВ-Транс'),
+    M(t,'15:30','Денис Эскизов','водитель','ТК',null,'перенесено'),
+    M(tm,'09:00','Сергей Черновой','водитель','СВ-Транс'),
+    M(tm,'14:30','Алина Набросок','логист','ТК'),
+    M(f,'10:30','Ирина Шаблон','логист','ТК'),
+  ];
+  $('stamp').textContent = 'демо-данные';
+}
+document.getElementById('savebar').onclick = () => { toast('Демо: в Telegram отметки уйдут в бот'); marks.clear(); draw();
+}
+
+load();
+</script>
+</body>
+</html>
