@@ -130,9 +130,11 @@ const DEMO = /[?&]demo/.test(location.search);
 /* Отметки уходят в бот через sendData — это работает, только если пульт открыт кнопкой под строкой ввода. */
 const P = new URLSearchParams(location.search);
 const BOT = P.get('b') || '';
-const RELAY = P.get('r') || (location.hash.match(/[#&]r=([A-Za-z0-9_-]+)/)||[])[1] || '';
-/* Отметки: из кнопки меню — через канал ntfy (бот проверяет подпись Telegram), из кнопки клавиатуры — sendData. */
-const CAN_SEND = !!(tg && tg.initData && (RELAY || !(tg.initDataUnsafe && tg.initDataUnsafe.query_id)));
+/* v8, 24.09: канал ntfy убран — компьютер с ботом его не видит, отметки терялись молча.
+   Из кнопки «📋 Пульт» под строкой ввода — sendData; из любого другого входа — ссылка /start с кодами
+   отметок прямо в чат бота. Оба пути идут только через Telegram. */
+const VIA_KEYBOARD = !!(tg && tg.initData && !(tg.initDataUnsafe && tg.initDataUnsafe.query_id));
+const CAN_SEND = !!(tg && (VIA_KEYBOARD || BOT));
 const marks = new Map();   // id -> итог, ещё не отправленные
 const $ = id => document.getElementById(id);
 
@@ -190,8 +192,11 @@ function pLoad(){
   try { j = pUnpack(); } catch(e) {}
   if (!j) return pFail('Откройте пульт из бота', 'Кнопка «📋 Пульт» — под строкой ввода в чате с ботом.');
   data = j.m.map(r => ({id:r[0], дата:r[1], время:r[2], имя:r[3], роль:r[4], аккаунт:r[5], результат:r[6], статус:r[7]||'ожидается', c:r[8]||''}));
-  { const q = String(j.t).match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/); now = q ? new Date(+q[1], q[2]-1, +q[3], +q[4], +q[5]) : new Date(); }
-  $('stamp').textContent = 'список на ' + hm(now) + (CAN_SEND ? '' : ' · только просмотр');
+  /* «сейчас» — по часам телефона, а не по времени списка: кнопка под строкой ввода обновляется
+     только с новым сообщением бота, и вечером пульт показывал утро (прошедшие встречи — как будущие) */
+  now = new Date();
+  const q = String(j.t).match(/(\d+)-(\d+)-(\d+)T(\d+):(\d+)/);
+  $('stamp').textContent = (q ? 'список от ' + q[4] + ':' + q[5] : 'список') + (CAN_SEND ? '' : ' · только просмотр');
   pDraw();
 }
 function pFail(t, s){
@@ -287,30 +292,21 @@ function pMainBtn(){
 let sending = false;
 async function pSend(){
   if (!marks.size || sending) return;
-  if (!CAN_SEND){ pHap('err'); pToast('Откройте пульт из бота — кнопка «СВ-Транс» слева от строки ввода'); return; }
+  if (!CAN_SEND){ pHap('err'); pToast('Откройте пульт из бота — кнопка «📋 Пульт» внизу'); return; }
   const payload = JSON.stringify({marks:[...marks.entries()]});
-  if (!RELAY){ pHap('ok'); tg.sendData(payload); return; }
+  if (VIA_KEYBOARD){ pHap('ok'); tg.sendData(payload); return; }
   sending = true;
-  try { tg.MainButton.showProgress(); } catch(e){}
   let ok = false;
-  try{
-    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 6000);
-    const r = await fetch('https://ntfy.sh/' + RELAY, {method:'POST', signal: ctl.signal,
-      body: JSON.stringify({marks:[...marks.entries()], initData: tg.initData})});
-    clearTimeout(tm); ok = r.ok;
-  }catch(e){ ok = false; }
-  if (!ok && BOT){
-    /* запасной путь без сторонних сервисов: ссылка /start с кодами отметок прямо в чат бота */
-    const L = {'пришёл_берём':'b','пришёл_не_подошёл':'n','не_пришёл':'x'};
-    const sp = 'm' + [...marks.entries()].slice(0,10).map(([id,res]) => {
-      const m = data.find(x => x.id===id); return (m && m.c ? m.c : '') + (L[res] || 'u'); }).filter(s => s.length===6).join('');
-    try { tg.openTelegramLink('https://t.me/' + BOT + '?start=' + sp); ok = true; } catch(e){}
-  }
+  /* не из клавиатуры: ссылка /start с кодами отметок прямо в чат бота (до 10 отметок за раз) */
+  const L = {'пришёл_берём':'b','пришёл_не_подошёл':'n','не_пришёл':'x'};
+  const sp = 'm' + [...marks.entries()].slice(0,10).map(([id,res]) => {
+    const m = data.find(x => x.id===id); return (m && m.c ? m.c : '') + (L[res] || 'u'); }).filter(s => s.length===6).join('');
+  try { tg.openTelegramLink('https://t.me/' + BOT + '?start=' + sp); ok = sp.length > 1; } catch(e){}
   if (ok){
     for (const id of marks.keys()){ const m = data.find(x => x.id===id); if (m) m.orig = m.результат; }
     marks.clear(); pDraw(); pHap('ok'); pToast('Сохранено. Бот подтвердит в чате');
   } else { pHap('err'); pToast('Не сохранилось — нет связи. Попробуйте ещё раз'); }
-  sending = false; try { tg.MainButton.hideProgress(); } catch(e){} pMainBtn();
+  sending = false; pMainBtn();
 }
 
 function pSetView(v){
